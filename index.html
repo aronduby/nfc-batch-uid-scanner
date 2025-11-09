@@ -164,6 +164,7 @@
         async function readingSuccess({ serialNumber }) {
             if (dataMap.has(serialNumber)) {
                 Logger.write(`> ERROR: Duplicate Serial Number: ${serialNumber}`);
+                await errorSound.play();
                 return;
             }
 
