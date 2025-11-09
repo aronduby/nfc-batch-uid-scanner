@@ -6,19 +6,57 @@
     <meta content="nfc-batch-uid-scanner" name="description">
     <meta content="width=device-width, initial-scale=1" name="viewport">
 
-    <title>nfc-batch-uid-scanner</title>
+    <title>Setup HWP Tags</title>
+
+    <style>
+        body {
+            margin: .5em 1em;
+        }
+
+        #batchControls {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 1em 0;
+        }
+
+        input[type="number"] {
+            width: 4ch;
+            text-align: center;
+        }
+    </style>
 </head>
 
 <body>
-<button id="scanButton">Scan</button>
-<strong>Count=<span id="counter2">0</span></strong>
-<button disabled id="saveButton">Copy / Save (HEX)</button>
-<button disabled id="saveDecButton">Copy / Save (DEC)</button>
+
+<div id="batchControls">
+    <fieldset>
+        <legend>Controls</legend>
+        <div>
+        <button id="start">🟢</button>
+        <button id="stop" disabled>🔴</button>
+        <button id="save" disabled>💾</button>
+        </div>
+    </fieldset>
+    <fieldset>
+        <legend><label for="batch">Batch #</label></legend>
+        <div>
+        <input type="number" id="batch" name="batch" value="1" />
+        <button id="batchInc">+</button>
+        <button id="batchDec">-</button>
+        </div>
+    </fieldset>
+    <fieldset>
+        <legend><label for="tag">Tag</label></legend>
+        <input type="number" id="tag" name="tag" value="1" />
+        <button id="tagInc">+</button>
+        <button id="tagDec">-</button>
+    </fieldset>
+</div>
 
 <h4>Log</h4>
 <pre id="output"></pre>
 
-<h4>Captured Data (<span id="counter1">0</span>)</h4>
+<h4>Captured Data (<span class="counter">0</span>)</h4>
 <pre id="data"></pre>
 
 <script>
@@ -28,7 +66,8 @@
                 return typeof argument === 'string' ? argument : JSON.stringify(argument);
             }).join(' ');
 
-            document.querySelector('#output').textContent += line + '\n';
+            const content = document.querySelector('#output').textContent;
+            document.querySelector('#output').textContent = line + '\n' + content;
         },
 
         writeData: function () {
@@ -36,7 +75,8 @@
                 return typeof argument === 'string' ? argument : JSON.stringify(argument);
             }).join(' ');
 
-            document.querySelector('#data').textContent += line + '\n';
+            const content = document.querySelector('#data').textContent;
+            document.querySelector('#data').textContent = line + '\n' + content;
         },
 
         clear: function () {
@@ -44,97 +84,162 @@
         },
     };
 
-    if (!("NDEFReader" in window)) {
-        Logger.write("Web NFC is not available. Use Chrome on Android.");
-    }
-
-
-    let counter = 0;
-    let tags = [];
-    let tagsDecimal = [];
-
-    function hexToDec(hexUid) {
-        return parseInt(hexUid.replaceAll(":", ""), 16);
-    }
-
-    async function copyAndShare(data) {
-        try {
-            await navigator.clipboard.writeText(data);
-            Logger.write("Copied to clipboard successfully");
-        } catch (err) {
-            Logger.write(`Error: ${err}`);
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!("NDEFReader" in window)) {
+            Logger.write("Web NFC is not available. Use Chrome on Android.");
+            return false;
         }
 
-        try {
-            await navigator.share({text: data});
-            Logger.write("Shared Successfully");
-        } catch (err) {
-            /* Logger.write(`Error: ${err}`); */
-        }
-    }
+        const ndef = new NDEFReader();
+        const dataMap = new Map();
+        let counter = 0;
+        let abort;
 
+        // controls
+        const startBtn = document.querySelector("#start");
+        const stopBtn = document.querySelector("#stop");
+        const saveBtn = document.querySelector("#save");
+        // batch
+        const batchInput = document.querySelector("#batch");
+        const batchIncBtn = document.querySelector("#batchInc");
+        const batchDecBtn = document.querySelector("#batchDec");
+        // tag
+        const tagInput = document.querySelector("#tag");
+        const tagIncBtn = document.querySelector("#tagInc");
+        const tagDecBtn = document.querySelector("#tagDec");
+        // counters
+        const counters = document.querySelectorAll(".counter");
+        // sounds
+        const successSound = new Audio("https://cdn.freesound.org/previews/654/654321_12315704-lq.mp3");
+        const errorSound = new Audio("https://cdn.freesound.org/previews/554/554053_12315704-lq.mp3");
 
-    const scanButton = document.querySelector("#scanButton");
-    scanButton.addEventListener("click", async () => {
-        Logger.write("User clicked scan button");
+        batchIncBtn.addEventListener("click", incrementBatch);
+        batchDecBtn.addEventListener("click", decrementBatch);
+        tagIncBtn.addEventListener("click", incrementTag);
+        tagDecBtn.addEventListener("click", decrementTag);
 
-        try {
-            const ndef = new NDEFReader();
-            const decoder = new TextDecoder();
-            await ndef.scan();
-            Logger.write("> Scan started");
-            scanButton.disabled = true;
+        startBtn.addEventListener("click", startScanning);
+        stopBtn.addEventListener("click", stopScanning);
+        saveBtn.addEventListener("click", saveData);
 
-            ndef.addEventListener("readingerror", () => {
-                Logger.write("Argh! Cannot read data from the NFC tag. Try another one?");
-            });
+        ndef.addEventListener("reading", readingSuccess);
+        ndef.addEventListener("readingerror", readingError);
 
-            ndef.addEventListener("reading", ({message, serialNumber}) => {
-                saveButton.disabled = false;
-                saveDecButton.disabled = false;
-                Logger.write(`> Serial Number: ${serialNumber}`);
-                const dec = hexToDec(serialNumber);
-                Logger.write(`> Serial Number (decimal): ${dec}`);
-                Logger.write(`> Records: (${message.records.length})`);
-
-                for (const record of message.records) {
-                    Logger.write(`>> Record Type: ${record.recordType}`);
-                    Logger.write(`>> MIME Type: ${record.mediaType}`);
-                    Logger.write(`>> Record ID: ${record.id}`);
-                    try {
-                        Logger.write(`>> Data: ${decoder.decode(record.data)}`);
-                    } catch (error) {
-                        Logger.write(`>> Data: ${record.data}`);
-                    }
+        async function startScanning() {
+            try {
+                if (abort) {
+                    abort.abort();
+                    abort = new AbortController();
                 }
 
-                if (tags.includes(serialNumber)) {
-                    Logger.write(`> Duplicate Tag`);
-                } else {
-                    tags.push(serialNumber);
-                    tagsDecimal.push(dec);
-                    Logger.writeData(serialNumber + "\t" + dec);
-                    counter++;
-                    Logger.write(`> Tag Count: ${counter}`);
-                    document.querySelector('#counter1').textContent = `${counter}`;
-                    document.querySelector('#counter2').textContent = `${counter}`;
-                }
-            });
-        } catch (error) {
-            Logger.write("> ERROR: " + error);
+                await ndef.scan({
+                    signal: abort.signal
+                });
+
+                stopBtn.disabled = false;
+                startBtn.disabled = true;
+
+                Logger.write("> Scanning started...");
+
+            } catch (e) {
+                Logger.write("> ERROR: " + e.message);
+            }
         }
-    });
 
-    const saveButton = document.querySelector("#saveButton");
-    saveButton.addEventListener("click", async () => {
-        let data = tags.join("\n");
-        await copyAndShare(data);
-    });
+        async function stopScanning() {
+            abort.abort();
+            abort = undefined;
 
-    const saveDecButton = document.querySelector("#saveDecButton");
-    saveDecButton.addEventListener("click", async () => {
-        let data = tagsDecimal.join("\n");
-        await copyAndShare(data);
+            stopBtn.disabled = true;
+            startBtn.disabled = false;
+        }
+
+        async function readingSuccess({ serialNumber }) {
+            if (dataMap.has(serialNumber)) {
+                Logger.write(`> ERROR: Duplicate Serial Number: ${serialNumber}`);
+                return;
+            }
+
+            try {
+                // write the url + serial number to the tag
+                await ndef.write(
+                    {
+                        records: [
+                            {
+                                recordType: "url",
+                                data: `https://tags.hudsonvillewaterpolo.com/${serialNumber}`,
+                            },
+                        ]
+                    },
+                    { overwrite: true }
+                );
+
+            } catch (e) {
+                Logger.write(`> ERROR: Failed to write ${e.message}`);
+                await errorSound.play();
+                return;
+            }
+
+            // successfully wrote the url, now save the data for export
+
+            const data = {
+                serialNumber,
+                batch: batchInput.value,
+                tag: tagInput.value,
+            };
+
+            dataMap.set(serialNumber, data);
+
+            Logger.write(`> Wrote Serial Number: ${serialNumber}`);
+            Logger.writeData(JSON.stringify(data));
+
+            incrementTag();
+            incrementCounters();
+            saveBtn.disabled = false;
+            await successSound.play();
+        }
+
+        function readingError() {
+            Logger.write("ERROR! Cannot read data from the NFC tag. Try another one?");
+            errorSound.play();
+        }
+
+        async function saveData() {
+            const data = Array.from(dataMap.values());
+            const csv = data
+                .map(datum => {
+                    return [datum.serialNumber, datum.batch, datum.tag].join(',');
+                })
+                .join("\n");
+
+            const blob = new Blob([csv], {type: "text/csv"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "scanned-tags.csv";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function incrementCounters() {
+            counter++;
+            counters.forEach(el => { el.textContent = '' + counter; });
+        }
+
+        function incrementBatch() {
+            batchInput.value = parseInt(batchInput.value) + 1;
+            tagInput.value = 1;
+        }
+        function decrementBatch() {
+            batchInput.value = parseInt(batchInput.value) - 1;
+        }
+
+        function incrementTag() {
+            tagInput.value = parseInt(tagInput.value) + 1;
+        }
+        function decrementTag() {
+            tagInput.value = parseInt(tagInput.value) - 1;
+        }
     });
 </script>
 </body>
