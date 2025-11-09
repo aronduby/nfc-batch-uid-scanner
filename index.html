@@ -129,8 +129,9 @@
             try {
                 if (abort) {
                     abort.abort();
-                    abort = new AbortController();
                 }
+
+                abort = new AbortController();
 
                 await ndef.scan({
                     signal: abort.signal
