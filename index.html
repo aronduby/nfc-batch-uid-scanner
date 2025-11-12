@@ -166,28 +166,6 @@
                 return;
             }
 
-            try {
-                // write the url + serial number to the tag
-                await ndef.write(
-                    {
-                        records: [
-                            {
-                                recordType: "url",
-                                data: `https://tags.hudsonvillewaterpolo.com/${serialNumber}`,
-                            },
-                        ]
-                    },
-                    { overwrite: true }
-                );
-
-            } catch (e) {
-                Logger.write(`> ERROR: Failed to write ${e.message}`);
-                await errorSound.play();
-                return;
-            }
-
-            // successfully wrote the url, now save the data for export
-
             const data = {
                 serialNumber,
                 batch: batchInput.value,
@@ -196,7 +174,7 @@
 
             dataMap.set(serialNumber, data);
 
-            Logger.write(`> Wrote Serial Number: ${serialNumber}`);
+            Logger.write(`> Saved Serial Number: ${serialNumber}`);
             Logger.writeData(JSON.stringify(data));
 
             incrementTag();
