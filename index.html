@@ -218,7 +218,7 @@
             if (dataMap.has(serialNumber)) {
                 Logger.write(`> ERROR: Duplicate Serial Number: ${serialNumber}`);
                 await errorSound.play();
-                if (!confirm('Tag already in dataset, would you like to override?')) {
+                if (!confirm('Tag already in dataset, would you like to override? (keep the tag in position if you continue)')) {
                     return;
                 }
             }
