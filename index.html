@@ -1,7 +1,6 @@
 ---
 # I don't think this frontmatter needs anything other than to exist so it is rendered through markdown
 ---
-{% capture buildTitle %}{{ site.github.source.branch }}: {{ site.github.build_revision }}{% endcapture %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -10,7 +9,7 @@
     <meta content="nfc-batch-uid-scanner" name="description">
     <meta content="width=device-width, initial-scale=1" name="viewport">
 
-    <title>{{ buildTitle }}</title>
+    <title>{{ site.github.source_branch }}</title>
 
     <style>
         body {
@@ -57,7 +56,7 @@
     </fieldset>
 </div>
 
-<h3>{{ buildTitle }}</h3>
+<h3>{{ site.github.source.branch }} <small style="font-weight: 100;">{{ site.github.build_revision | slice: 0, 7 }}</small></h3>
 
 <h4>Log</h4>
 <pre id="output"></pre>
