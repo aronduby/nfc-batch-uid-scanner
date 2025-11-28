@@ -1,3 +1,6 @@
+---
+# I don't think this frontmatter needs anything other than to exist so it is rendered through markdown
+---
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,7 +9,7 @@
     <meta content="nfc-batch-uid-scanner" name="description">
     <meta content="width=device-width, initial-scale=1" name="viewport">
 
-    <title>Setup HWP Tags</title>
+    <title>{{ site.github.source_branch }}</title>
 
     <style>
         body {
@@ -101,7 +104,43 @@
             <option data-name="Wyatt Clapp" value="10">Wyatt Clapp</option>
         </select>
     </fieldset>
+    <fieldset class="wide">
+        <legend><label for="renderableType">Renderable Type</label></legend>
+        <select id="renderableType" name="renderableType">
+            <option value="App\Models\Tags\Pokemon">Pokemon</option>
+            <option value="App\Models\Tags\PokemonForParents" selected>Pokemon for Parents</option>
+        </select>
+    </fieldset>
+    <fieldset class="wide">
+        <legend><label for="renderableId">Renderable Id</label></legend>
+        <select id="renderableId" name="renderableId">
+            <option data-name="Aiden Bayle" value="15">Aiden Bayle</option>
+            <option data-name="Andrew Barnes" value="16">Andrew Barnes</option>
+            <option data-name="Breck Sarber" value="1">Breck Sarber</option>
+            <option data-name="Brendan Lawrence" value="19">Brendan Lawrence</option>
+            <option data-name="Connor Killgore" value="20">Connor Killgore</option>
+            <option data-name="Graham Johnson" value="6">Graham Johnson</option>
+            <option data-name="Graham Sarber" value="14">Graham Sarber</option>
+            <option data-name="Ian Worst" value="4">Ian Worst</option>
+            <option data-name="Jack Laning" value="11">Jack Laning</option>
+            <option data-name="Jordan Blum" value="3">Jordan Blum</option>
+            <option data-name="Josh Ahrendt" value="2">Josh Ahrendt</option>
+            <option data-name="Kaleb Barricklow" value="21">Kaleb Barricklow</option>
+            <option data-name="Lucas Rivas" value="22">Lucas Rivas</option>
+            <option data-name="Luke Meerman" value="8">Luke Meerman</option>
+            <option data-name="Matthew Lawrence" value="7">Matthew Lawrence</option>
+            <option data-name="Nolan Williams" value="9">Nolan Williams</option>
+            <option data-name="Ryan Wiles" value="5">Ryan Wiles</option>
+            <option data-name="Teagan Sorensen" value="18">Teagan Sorensen</option>
+            <option data-name="Trevor Roehling" value="13">Trevor Roehling</option>
+            <option data-name="Westin Wohlfert" value="12">Westin Wohlfert</option>
+            <option data-name="William Hemmes" value="17">William Hemmes</option>
+            <option data-name="Wyatt Clapp" value="10">Wyatt Clapp</option>
+        </select>
+    </fieldset>
 </div>
+
+<h3>{{ site.github.source.branch }} <small style="font-weight: 100;">{{ site.github.build_revision | slice: 0, 7 }}</small></h3>
 
 <h4>Log</h4>
 <pre id="output"></pre>
@@ -212,7 +251,9 @@
             if (dataMap.has(serialNumber)) {
                 Logger.write(`> ERROR: Duplicate Serial Number: ${serialNumber}`);
                 await errorSound.play();
-                return;
+                if (!confirm('Tag already in dataset, would you like to override? (keep the tag in position if you continue)')) {
+                    return;
+                }
             }
 
             try {
@@ -262,6 +303,11 @@
         }
 
         async function saveData() {
+            const name = prompt('What would you like it to be named?', 'scanned-tags.csv');
+            if (!name) {
+                return false;
+            }
+
             const data = Array.from(dataMap.values());
             const csv = data
                 .map(datum => {
@@ -273,7 +319,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "scanned-tags.csv";
+            a.download = name;
             a.click();
             URL.revokeObjectURL(url);
         }
